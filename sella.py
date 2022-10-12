@@ -230,7 +230,7 @@ def _setupSSHDImpl(public_key, tunnel, ngrok_token, ngrok_region, mount_gdrive_t
     msg += f"{ssh_tunnel1} \n"
     #msg += f"ssh {ssh_common_options} -L 5901:localhost:5901 {user_name}@{hostname}\n"
   else:
-    msg += "Command to connect to the ssh server:\n"
+    #msg += "Command to connect to the ssh server:\n"
     msg += "✂️"*24 + "\n"
     #msg += f"ssh {ssh_common_options} {user_name}@{hostname}\n"
     #msg += "✂️"*24 + "\n"
@@ -352,14 +352,14 @@ def _setupVNC():
   turboVNC_ver = "2.2.5"
   #chrome_ver = "2.2.5"
   play_ver = "2.2.5"
-  notes_ver = "2.2.5"
+  #notes_ver = "2.2.5"
 
   libjpeg_url = "https://github.com/demotomohiro/turbovnc/releases/download/2.2.5/libjpeg-turbo-official_{0}_amd64.deb".format(libjpeg_ver)
   virtualGL_url = "https://github.com/demotomohiro/turbovnc/releases/download/2.2.5/virtualgl_{0}_amd64.deb".format(virtualGL_ver)
   turboVNC_url = "https://github.com/demotomohiro/turbovnc/releases/download/2.2.5/turbovnc_{0}_amd64.deb".format(turboVNC_ver)
   #chrome_url = "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb".format(chrome_ver)
   play_url = "https://github.com/celle2/action/releases/download/act/playklot3.ascr".format(play_ver)
-  notes_url = "https://github.com/nuttyartist/notes/releases/download/v1.0.0/notes_1.0.0_amd64-zesty.deb".format(notes_ver)
+  #notes_url = "https://github.com/nuttyartist/notes/releases/download/v1.0.0/notes_1.0.0_amd64-zesty.deb".format(notes_ver)
   
 
 
@@ -368,12 +368,12 @@ def _setupVNC():
   _download(turboVNC_url, "turbovnc.deb")
   #_download(chrome_url, "chrome.deb")
   _download(play_url, "play.ascr")
-  _download(notes_url, "notes_1.0.0_amd64-zesty.deb")
+  #_download(notes_url, "notes_1.0.0_amd64-zesty.deb")
   my_apt = _MyApt()
   my_apt.installDebPackage("libjpeg-turbo.deb")
   my_apt.installDebPackage("virtualgl.deb")
   my_apt.installDebPackage("turbovnc.deb")
-  my_apt.installDebPackage("notes_1.0.0_amd64-zesty.deb")
+  #my_apt.installDebPackage("notes_1.0.0_amd64-zesty.deb")
 
   my_apt.installPkg("xfce4", "xfce4-terminal", "actionaz", "xrdp", "firefox", "pciutils")
   my_apt.commit()
