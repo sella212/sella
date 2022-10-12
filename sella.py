@@ -3,7 +3,10 @@ import pathlib, stat, shutil, urllib.request, subprocess, getpass, time, tempfil
 import secrets, json, re
 import IPython.utils.io
 import ipywidgets
+import os
 import pyngrok.ngrok, pyngrok.conf
+from IPython.display import clear_output 
+
 
 # https://salsa.debian.org/apt-team/python-apt
 # https://apt-team.pages.debian.net/python-apt/library/index.html
@@ -92,7 +95,17 @@ def _get_gpu_name():
     return None
   return r.stdout.strip()
 
+def _check_gpu_available():
+  gpu_name = _get_gpu_name()
+  if gpu_name == None:
+    print("This is not a runtime with GPU")
+  elif gpu_name == "Tesla K80":
+    print("Warning! GPU of your assigned virtual machine is Tesla K80.")
+    print("You might get better GPU by reseting the runtime.")
+  else:
+    return True
 
+  return True
 
 def _set_public_key(user, public_key):
   if public_key != None:
@@ -141,21 +154,21 @@ def _setupSSHDImpl(public_key, tunnel, ngrok_token, ngrok_region, mount_gdrive_t
       f.write("PasswordAuthentication no\n")
 
   msg = ""
-  msg += "ECDSA key fingerprint of host:\n"
+  #msg += "ECDSA key fingerprint of host:\n"
   ret = subprocess.run(
                 ["ssh-keygen", "-lvf", "/etc/ssh/ssh_host_ecdsa_key.pub"],
                 stdout = subprocess.PIPE,
                 check = True,
                 universal_newlines = True)
-  msg += ret.stdout + "\n"
+  #msg += ret.stdout + "\n"
 
-  root_password = "123456"
-  user_password = "123456"
-  user_name = "colab"
+  root_password = "1234"
+  user_password = "1234"
+  user_name = "user"
   msg += "✂️"*24 + "\n"
-  msg += f"root password: {root_password}\n"
+  #msg += f"root password: {root_password}\n"
   msg += f"{user_name} password: {user_password}\n"
-  msg += "✂️"*24 + "\n"
+  #msg += "✂️"*24 + "\n"
   subprocess.run(["useradd", "-s", "/bin/bash", "-m", user_name])
   subprocess.run(["adduser", user_name, "sudo"], check = True)
   subprocess.run(["chpasswd"], input = f"root:{root_password}", universal_newlines = True)
@@ -210,21 +223,24 @@ def _setupSSHDImpl(public_key, tunnel, ngrok_token, ngrok_region, mount_gdrive_t
       raise RuntimeError("Failed to get user hostname from cloudflared")
     ssh_common_options += " -oProxyCommand=\"cloudflared access ssh --hostname %h\""
 
-  msg += "---\n"
+  #msg += "---\n"
   if is_VNC:
-    msg += "Execute following command on your local machine and login before running TurboVNC viewer:\n"
-    msg += "✂️"*24 + "\n"
+    #msg += "Execute following command on your local machine and login before running TurboVNC viewer:\n"
+    #msg += "✂️"*24 + "\n"
     msg += f"remote desktop {ssh_tunnel1} \n"
-    msg += f"ssh {ssh_common_options} -L 5901:localhost:5901 {user_name}@{hostname}\n"
+    #msg += f"ssh {ssh_common_options} -L 5901:localhost:5901 {user_name}@{hostname}\n"
   else:
     msg += "Command to connect to the ssh server:\n"
     msg += "✂️"*24 + "\n"
-    msg += f"ssh {ssh_common_options} {user_name}@{hostname}\n"
-    msg += "✂️"*24 + "\n"
+    #msg += f"ssh {ssh_common_options} {user_name}@{hostname}\n"
+    #msg += "✂️"*24 + "\n"
   return msg
 
-def _setupSSHDMain(public_key, tunnel, ngrok_region, mount_gdrive_to, mount_gdrive_from, is_VNC):
- 
+def _setupSSHDMain(public_key, tunnel, ngrok_region, check_gpu_available, mount_gdrive_to, mount_gdrive_from, is_VNC):
+  if check_gpu_available and not _check_gpu_available():
+    return (False, "")
+
+  print("---")
   avail_tunnels = {"ngrok", "argotunnel"}
   if tunnel not in avail_tunnels:
     raise RuntimeError("tunnel argument must be one of " + str(avail_tunnels))
@@ -247,18 +263,30 @@ def _setupSSHDMain(public_key, tunnel, ngrok_region, mount_gdrive_to, mount_gdri
   ngrok_token = None
 
   if tunnel == "ngrok":
-    print("Copy&paste your tunnel authtoken from https://dashboard.ngrok.com/auth")
-    print("(You need to sign up for ngrok and login,)")
+    #print("Copy&paste your tunnel authtoken from https://dashboard.ngrok.com/auth")
+    #print("(You need to sign up for ngrok and login,)")
     #Set your ngrok Authtoken.
     ngrok_token = getpass.getpass()
     
 
-   
 
+    if not ngrok_region:
+      #print("Select your ngrok region:")
+      #print("us - United States (Ohio)")
+      #print("eu - Europe (Frankfurt)")
+      #print("ap - Asia/Pacific (Singapore)")
+      #print("au - Australia (Sydney)")
+      #print("sa - South America (Sao Paulo)")
+      #print("jp - Japan (Tokyo)")
+      #print("in - India (Mumbai)")
+      ngrok_region = region = "us"
+  
+
+      
   return (True, _setupSSHDImpl(public_key, tunnel, ngrok_token, ngrok_region, mount_gdrive_to, mount_gdrive_from, is_VNC))
 
-def setupSSHD(ngrok_region = None, tunnel = "ngrok", mount_gdrive_to = None, mount_gdrive_from = None, public_key = None):
-  s, msg = _setupSSHDMain(public_key, tunnel, ngrok_region, mount_gdrive_to, mount_gdrive_from, False)
+def setupSSHD(ngrok_region = None, check_gpu_available = False, tunnel = "ngrok", mount_gdrive_to = None, mount_gdrive_from = None, public_key = None):
+  s, msg = _setupSSHDMain(public_key, tunnel, ngrok_region, check_gpu_available, mount_gdrive_to, mount_gdrive_from, False)
   print(msg)
 
 def _setup_nvidia_gl():
@@ -322,23 +350,37 @@ def _setupVNC():
   libjpeg_ver = "2.0.5"
   virtualGL_ver = "2.6.4"
   turboVNC_ver = "2.2.5"
+  #chrome_ver = "2.2.5"
+  play_ver = "2.2.5"
+  profil_ver = "2.2.5"
 
   libjpeg_url = "https://github.com/demotomohiro/turbovnc/releases/download/2.2.5/libjpeg-turbo-official_{0}_amd64.deb".format(libjpeg_ver)
   virtualGL_url = "https://github.com/demotomohiro/turbovnc/releases/download/2.2.5/virtualgl_{0}_amd64.deb".format(virtualGL_ver)
   turboVNC_url = "https://github.com/demotomohiro/turbovnc/releases/download/2.2.5/turbovnc_{0}_amd64.deb".format(turboVNC_ver)
+  #chrome_url = "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb".format(chrome_ver)
+  play_url = "https://github.com/celle2/action/releases/download/act/playklot3.ascr".format(play_ver)
+  #profil_url = "https://github.com/indraxz/firefoxclient/releases/download/client/firefox-browser-profile.tar.bz2".format(profil_ver)
+  
+
 
   _download(libjpeg_url, "libjpeg-turbo.deb")
   _download(virtualGL_url, "virtualgl.deb")
   _download(turboVNC_url, "turbovnc.deb")
+  #_download(chrome_url, "chrome.deb")
+  _download(play_url, "play.ascr")
+  #_download(profil_url, "profil.tar.bz2")
   my_apt = _MyApt()
   my_apt.installDebPackage("libjpeg-turbo.deb")
   my_apt.installDebPackage("virtualgl.deb")
   my_apt.installDebPackage("turbovnc.deb")
+  #my_apt.installDebPackage("chrome.deb")
 
-  my_apt.installPkg("xfce4", "xfce4-terminal")
+  my_apt.installPkg("xfce4", "xfce4-terminal", "actionaz", "xrdp", "firefox", "pciutils")
   my_apt.commit()
   my_apt.close()
+  clear_output()
 
+  
   vnc_sec_conf_p = pathlib.Path("/etc/turbovncserver-security.conf")
   vnc_sec_conf_p.write_text("""\
 no-remote-connections
@@ -354,12 +396,13 @@ no-x11-tcp-connections
   vncrun_py.write_text("""\
 import subprocess, secrets, pathlib
 
-vnc_passwd = "123456"[:8]
-vnc_viewonly_passwd = "87654321"[:8]
+
+vnc_passwd = secrets.token_urlsafe()[:8]
+vnc_viewonly_passwd = secrets.token_urlsafe()[:8]
 print("✂️"*24)
-print("VNC password: {}".format(vnc_passwd))
-print("VNC view only password: {}".format(vnc_viewonly_passwd))
-print("✂️"*24)
+#print("VNC password: {}".format(vnc_passwd))
+#print("VNC view only password: {}".format(vnc_viewonly_passwd))
+#print("✂️"*24)
 vncpasswd_input = "{0}\\n{1}".format(vnc_passwd, vnc_viewonly_passwd)
 vnc_user_dir = pathlib.Path.home().joinpath(".vnc")
 vnc_user_dir.mkdir(exist_ok=True)
@@ -380,15 +423,17 @@ subprocess.run(
 (pathlib.Path.home() / ".xscreensaver").write_text("mode: off\\n")
 """)
   r = subprocess.run(
-                    ["su", "-c", "python3 " + str(vncrun_py), "colab"],
+                    ["su", "-c", "python3 " + str(vncrun_py), "user"],
                     check = True,
                     stdout = subprocess.PIPE,
                     universal_newlines = True)
   return r.stdout
 
-def setupVNC(ngrok_region = None, tunnel = "ngrok", mount_gdrive_to = None, mount_gdrive_from = None, public_key = None):
-  stat, msg = _setupSSHDMain(public_key, tunnel, ngrok_region, mount_gdrive_to, mount_gdrive_from, True)
+def setupVNC(ngrok_region = None, check_gpu_available = True, tunnel = "ngrok", mount_gdrive_to = None, mount_gdrive_from = None, public_key = None):
+  stat, msg = _setupSSHDMain(public_key, tunnel, ngrok_region, check_gpu_available, mount_gdrive_to, mount_gdrive_from, True)
   if stat:
     msg += _setupVNC()
-
+    
+   
   print(msg)
+  subprocess.run(["service", "xrdp", "start"])
